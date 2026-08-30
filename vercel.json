@@ -6,8 +6,14 @@
   ],
   "routes": [
     { "src": "/api/chat", "dest": "/api/chat.js" },
-    { "src": "/api/models", "dest": "/api/models.js" }
+    { "src": "/api/models", "dest": "/api/models.js" },
+    { "src": "/api/image", "dest": "/api/image.js" },
+    { "src": "/api/image/edit", "dest": "/api/image-edit.js" }
   ],
+  "functions": {
+    "api/image.js": { "maxDuration": 120 },
+    "api/image-edit.js": { "maxDuration": 120 }
+  },
   "headers": [
     {
       "source": "/api/(.*)",
