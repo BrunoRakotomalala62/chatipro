@@ -1,0 +1,15 @@
+{
+  "name": "chatipro",
+  "version": "1.0.0",
+  "description": "API REST non-officielle pour chati.pro — GET /api/chat?prompt=...&model=...&uid=... (10 modèles)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": ["chati", "chati.pro", "api", "proxy", "vercel", "chat"],
+  "license": "MIT"
+}
