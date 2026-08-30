@@ -11,8 +11,8 @@
     { "src": "/api/image/edit", "dest": "/api/image-edit.js" }
   ],
   "functions": {
-    "api/image.js": { "maxDuration": 120 },
-    "api/image-edit.js": { "maxDuration": 120 }
+    "api/image.js": { "maxDuration": 60 },
+    "api/image-edit.js": { "maxDuration": 60 }
   },
   "headers": [
     {
