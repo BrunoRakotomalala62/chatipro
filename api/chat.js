@@ -1,20 +1,20 @@
 /**
- * GET /api/chat?prompt=bonjour&model=gemini-3.1-flash-lite&uid=123&stream=true
+ * GET/POST /api/chat — Chat texte (10 modèles), multi-tours possible
  *
- * Query parameters:
- *   prompt      (required) user message
- *   model       (optional) model id, friendly name or provider alias
- *               (default: gemini-3.1-flash-lite)
- *   uid         (optional) caller identifier, echoed back in the response
- *   stream      (optional) "true" -> SSE streaming, default: JSON
- *   system      (optional) system prompt
- *   temperature (optional) 0..2 (default 0.7)
+ * Paramètres (GET query / POST JSON) :
+ *   prompt      message de l'utilisateur (requis si messages absent)
+ *   messages    (optionnel) historique complet : tableau JSON de {role, content}
+ *               (ex. [{"role":"system","content":"..."},{"role":"user","content":"..."}])
+ *   model       (optionnel) id, nom ou alias (défaut : gemini-3.1-flash-lite)
+ *   uid         (optionnel) identifiant appelant, échoé dans la réponse
+ *   stream      (optionnel) "true" -> SSE streaming, sinon JSON
+ *   system      (optionnel) prompt système (utilisé avec prompt seul)
+ *   temperature (optionnel) 0..2 (défaut 0.7)
  *
- * Examples:
- *   /api/chat?prompt=bonjour
- *   /api/chat?prompt=bonjour&model=claude
- *   /api/chat?prompt=bonjour&model=openai/gpt-5.4-nano&uid=123
- *   /api/chat?prompt=bonjour&stream=true
+ * Exemples :
+ *   GET  /api/chat?prompt=bonjour
+ *   POST /api/chat  { "messages": [{"role":"system","content":"Tu es un quiz."},{"role":"user","content":"commence"}] }
+ *   GET  /api/chat?messages=%5B%7B%22role%22%3A%22user%22... (JSON encodé)
  */
 const {
   CHAT_MODELS,
@@ -34,6 +34,28 @@ function parseBool(value) {
   return value === "true" || value === "1";
 }
 
+/** Valide un historique de messages : [{role, content}] */
+function parseMessages(value) {
+  if (value === null || value === undefined || value === "") return null;
+  let parsed = value;
+  if (typeof parsed === "string") {
+    try {
+      parsed = JSON.parse(parsed);
+    } catch {
+      throw new Error("Le paramètre 'messages' doit être un JSON valide (tableau de {role, content}).");
+    }
+  }
+  if (!Array.isArray(parsed) || parsed.length === 0) {
+    throw new Error("Le paramètre 'messages' doit être un tableau non vide de {role, content}.");
+  }
+  for (const m of parsed) {
+    if (!m || typeof m !== "object" || typeof m.role !== "string" || typeof m.content !== "string") {
+      throw new Error("Chaque message doit avoir 'role' (string) et 'content' (string).");
+    }
+  }
+  return parsed;
+}
+
 module.exports = async function handler(req, res) {
   // Allow both GET and POST (form/JSON) for convenience.
   const url = new URL(req.url, "http://localhost");
@@ -41,8 +63,9 @@ module.exports = async function handler(req, res) {
 
   let prompt = params.get("prompt");
   let system = params.get("system");
+  let messagesParam = params.get("messages");
 
-  if (req.method === "POST" && (prompt === null)) {
+  if (req.method === "POST") {
     try {
       const body = await new Promise((resolve, reject) => {
         let data = "";
@@ -54,6 +77,7 @@ module.exports = async function handler(req, res) {
         const parsed = JSON.parse(body);
         prompt = prompt ?? parsed.prompt ?? parsed.message ?? null;
         system = system ?? parsed.system ?? null;
+        messagesParam = messagesParam ?? parsed.messages ?? null;
       }
     } catch {
       // ignore malformed JSON body, rely on query params
@@ -68,15 +92,31 @@ module.exports = async function handler(req, res) {
     ? Number(rawTemp)
     : undefined;
 
-  if (!prompt || !String(prompt).trim()) {
-    return sendJson(res, 400, {
-      error: "Le paramètre 'prompt' est requis.",
-      usage: "/api/chat?prompt=bonjour&model=gemini-3.1-flash-lite&uid=123",
-    });
+  // Historique complet fourni ? sinon construire depuis prompt/system
+  let messages;
+  let historyMode = false;
+  try {
+    const parsedHistory = parseMessages(messagesParam);
+    if (parsedHistory) {
+      messages = parsedHistory;
+      historyMode = true;
+    }
+  } catch (err) {
+    return sendJson(res, 400, { error: err.message });
   }
 
+  if (!historyMode) {
+    if (!prompt || !String(prompt).trim()) {
+      return sendJson(res, 400, {
+        error: "Le paramètre 'prompt' est requis (ou fournissez 'messages').",
+        usage: "/api/chat?prompt=bonjour&model=gemini-3.1-flash-lite&uid=123",
+      });
+    }
+    messages = normalizeMessages(prompt, system);
+  }
+
+  const lastUserMsg = [...messages].reverse().find((m) => m.role === "user");
   const model = resolveModel(modelParam);
-  const messages = normalizeMessages(prompt, system);
 
   try {
     const upstream = await callChati({
@@ -116,7 +156,8 @@ module.exports = async function handler(req, res) {
       model: model.id,
       provider: model.provider,
       uid,
-      prompt,
+      prompt: historyMode && lastUserMsg ? String(lastUserMsg.content) : prompt,
+      history: historyMode ? messages.length : null,
       reply: answer,
       usage: data.usage || null,
       available_models: CHAT_MODELS.map((m) => m.id),
