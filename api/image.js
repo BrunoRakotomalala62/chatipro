@@ -12,7 +12,7 @@
  * Réponse :
  *   { prompt, mode: "create", image: { mime_type, data (base64) }, dataUrl }
  */
-const { callImageGeneration } = require("../lib/chati");
+const { callImageGeneration, applyCors } = require("../lib/chati");
 
 function sendJson(res, status, obj) {
   res.statusCode = status;
@@ -34,6 +34,7 @@ async function readJsonBody(req) {
 }
 
 module.exports = async function handler(req, res) {
+  if (applyCors(req, res)) return; // preflight OPTIONS / headers CORS
   const url = new URL(req.url, "http://localhost");
 
   let prompt = url.searchParams.get("prompt");

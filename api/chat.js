@@ -21,6 +21,7 @@ const {
   resolveModel,
   normalizeMessages,
   callChati,
+  applyCors,
 } = require("../lib/chati");
 
 function sendJson(res, status, obj) {
@@ -57,6 +58,7 @@ function parseMessages(value) {
 }
 
 module.exports = async function handler(req, res) {
+  if (applyCors(req, res)) return; // preflight OPTIONS / headers CORS
   // Allow both GET and POST (form/JSON) for convenience.
   const url = new URL(req.url, "http://localhost");
   const params = url.searchParams;
