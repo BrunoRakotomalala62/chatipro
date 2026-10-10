@@ -11,6 +11,10 @@ const chatHandler = require("./api/chat");
 const modelsHandler = require("./api/models");
 const imageHandler = require("./api/image");
 const imageEditHandler = require("./api/image-edit");
+// --- ai-chatpro.com (module indépendant, ajouté sans toucher l'existant) ---
+const aichatproModelsHandler = require("./api/aichatpro/models");
+const aichatproImageHandler = require("./api/aichatpro/image");
+const aichatproImageEditHandler = require("./api/aichatpro/image-edit");
 
 const PORT = process.env.PORT || 3000;
 
@@ -29,12 +33,25 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === "/api/image" || url.pathname === "/api/image/") {
       return await imageHandler(req, res);
     }
+    // --- routes ai-chatpro.com (ajout additif) ---
+    if (url.pathname === "/api/aichatpro/models" || url.pathname === "/api/aichatpro/models/") {
+      return await aichatproModelsHandler(req, res);
+    }
+    if (url.pathname === "/api/aichatpro/image/edit" || url.pathname === "/api/aichatpro/image/edit/") {
+      return await aichatproImageEditHandler(req, res);
+    }
+    if (url.pathname === "/api/aichatpro/image" || url.pathname === "/api/aichatpro/image/") {
+      return await aichatproImageHandler(req, res);
+    }
     if (url.pathname === "/" || url.pathname === "/api") {
       res.statusCode = 200;
       res.setHeader("Content-Type", "application/json; charset=utf-8");
       return res.end(JSON.stringify({
         name: "chatipro API",
-        endpoints: ["/api/chat", "/api/models", "/api/image", "/api/image/edit"],
+        endpoints: [
+          "/api/chat", "/api/models", "/api/image", "/api/image/edit",
+          "/api/aichatpro/models", "/api/aichatpro/image", "/api/aichatpro/image/edit",
+        ],
         example: "/api/chat?prompt=bonjour&model=gemini-3.1-flash-lite&uid=123",
       }, null, 2));
     }
